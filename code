@@ -1,0 +1,144 @@
+# Import necessary libraries
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+from sklearn.preprocessing import LabelEncoder
+
+print("Libraries imported successfully!")
+
+csv_file_path = "Iris.csv" # Placeholder, update this to your actual path!
+
+feature_cols = ['SepalLengthCm', 'SepalWidthCm', 'PetalLengthCm', 'PetalWidthCm']
+target_col = 'Species'
+
+# 1. Load the Iris Dataset from CSV
+print("\n--- Loading Iris Dataset from CSV ---")
+try:
+    df = pd.read_csv(csv_file_path)
+    if df.empty:
+        print("Error: The loaded DataFrame is empty. Please check the CSV file content.")
+        exit() 
+    
+    required_cols = feature_cols + [target_col]
+    missing_cols = [col for col in required_cols if col not in df.columns]
+    if missing_cols:
+        print(f"Error: The following required columns are missing from the dataset: {missing_cols}")
+        print(f"Available columns are: {df.columns.tolist()}")
+        exit() 
+
+    print(f"Dataset loaded successfully from: {csv_file_path}")
+    print("\nFirst 5 rows of the DataFrame:")
+    print(df.head())
+    print("\nDataset information:")
+    df.info()
+
+except FileNotFoundError:
+    print(f"Error: The file '{csv_file_path}' was not found.")
+    print("Please ensure you have unzipped the dataset and updated 'csv_file_path' to the correct location.")
+    exit()
+except Exception as e:
+    print(f"An unexpected error occurred while loading the CSV: {e}")
+    print("Please check the CSV file's integrity and format (e.g., proper delimiter, no corruption).")
+    exit()
+
+# Extract features (X) and target (y)
+X = df[feature_cols]
+y = df[target_col]
+
+# Debugging prints for type and shape of X and y
+print(f"DEBUG: Type of X after assignment: {type(X)}")
+print(f"DEBUG: Shape of X after assignment: {X.shape}")
+print(f"DEBUG: Type of y after assignment: {type(y)}")
+print(f"DEBUG: Shape of y after assignment: {y.shape}")
+
+# Check if y needs encoding (if it contains strings)
+if isinstance(y.iloc[0], str):
+    print("\nConverting string species names to numerical labels...")
+    le = LabelEncoder()
+    y_encoded = le.fit_transform(y)
+    target_names = le.classes_
+    y = y_encoded
+else:
+    # If y is already numerical, infer target names
+    if sorted(y.unique().tolist()) == [0, 1, 2]:
+        target_names = ['setosa', 'versicolor', 'virginica']
+    else:
+        # Fallback for other numerical labels
+        target_names = [str(i) for i in sorted(y.unique())]
+        print("Warning: Target names inferred from unique numerical labels. Please verify if they match actual species.")
+
+
+print(f"Features (X) shape: {X.shape}")
+print(f"Target (y) shape: {y.shape}")
+print(f"Feature names: {X.columns.tolist()}")
+print(f"Target names: {target_names}")
+
+
+# 2. Explore the Data (EDA)
+print("\n--- Exploratory Data Analysis (EDA) ---")
+
+# Add encoded species and original species names back to df for plotting
+# Ensure 'species_encoded' is added correctly. 'y' is now the numerical array.
+# Check if 'y' is already a pandas Series before adding it to df
+if isinstance(y, pd.Series):
+    df['species_encoded'] = y # This uses the *updated* 'y' (numerical)
+else:
+    df['species_encoded'] = pd.Series(y, index=df.index) # Convert numpy array to Series with original index
+
+df['species_name'] = df[target_col] # Use the original 'Species' column for names
+
+
+# Visualize relationships between all features
+print("Generating pairplot... (This might take a moment)")
+sns.pairplot(df, hue='species_name', vars=feature_cols, palette='husl')
+plt.suptitle('Pairplot of Iris Dataset', y=1.02) # Adjust title position
+plt.show()
+print("Pairplot displayed. Notice how some features (like petal length/width) separate species better.")
+
+# Correlation matrix
+print("\nCorrelation Matrix:")
+print(X.corr())
+
+
+# 3. Split the Data into Training and Testing Sets
+print("\n--- Splitting Data into Training and Testing Sets ---")
+# Use the numerically encoded 'y' for splitting
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42, stratify=y)
+
+
+print(f"Training features (X_train) shape: {X_train.shape}")
+print(f"Testing features (X_test) shape: {X_test.shape}")
+print(f"Training target (y_train) shape: {y_train.shape}")
+print(f"Testing target (y_test) shape: {y_test.shape}")
+
+# 4. Choose and Train the Decision Tree Classifier
+print("\n--- Training Decision Tree Classifier Model ---")
+
+dtree = DecisionTreeClassifier(random_state=42)
+dtree.fit(X_train, y_train)
+y_pred_dtree = dtree.predict(X_test)
+
+# 5. Evaluate Decision Tree Model Performance
+print("\n--- Evaluating Decision Tree Model Performance ---")
+
+def evaluate_model(model_name, y_true, y_pred, target_names):
+    """Helper function to evaluate and print metrics for a model."""
+    print(f"\n***** {model_name} Results *****")
+    accuracy = accuracy_score(y_true, y_pred)
+    print(f"Accuracy: {accuracy:.4f}")
+
+    print("\nConfusion Matrix:")
+    cm = confusion_matrix(y_true, y_pred)
+    cm_df = pd.DataFrame(cm, index=target_names, columns=target_names)
+    print(cm_df)
+
+    print("\nClassification Report:")
+    print(classification_report(y_true, y_pred, target_names=target_names))
+
+# Evaluate only the Decision Tree
+evaluate_model("Decision Tree Classifier", y_test, y_pred_dtree, target_names)
+
+print("\nProject completed successfully!")
